@@ -42,7 +42,7 @@ El servicio queda disponible en `http://localhost:8080`. Si el frontend se sirve
 
 ## Ejecutar frontend
 
-Desde la carpeta separada `front-fullstack`:
+Desde la carpeta separada `front-fullstack` (consulta su `.env.example` y copia ese archivo como `.env.local` si necesitas cambiar la URL de la API):
 
 ```powershell
 npm install
