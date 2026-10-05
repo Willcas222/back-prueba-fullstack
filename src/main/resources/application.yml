@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: soporte
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/tickets}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    open-in-view: false
+    show-sql: ${JPA_SHOW_SQL:false}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+notification:
+  hablame:
+    enabled: ${HABLAME_ENABLED:false}
+    url: ${HABLAME_URL:https://api101.hablame.co/api/sms/v3/send/marketing}
+    customer: ${HABLAME_CUSTOMER:}
+    api-key: ${HABLAME_API_KEY:}
+    password: ${HABLAME_PASSWORD:}
+    username: ${HABLAME_USERNAME:}
+    flash: ${HABLAME_FLASH:true}
+
+frontend:
+  origin: ${FRONTEND_ORIGIN:http://localhost:5173}

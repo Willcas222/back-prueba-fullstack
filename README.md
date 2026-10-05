@@ -2,29 +2,36 @@
 
 Backend REST para administrar solicitudes de soporte. El frontend React se mantiene en la carpeta hermana `../front-fullstack`, separado del repositorio del backend.
 
-## Requisitos
+## Ejecutar todo con Docker
 
-- Java 17 o superior
-- PostgreSQL 14 o superior
-- Node.js 20.19+ y npm (solo para el frontend)
-
-## Base de datos
-
-Crea una base PostgreSQL antes de iniciar el backend:
-
-```sql
-CREATE DATABASE tickets;
-```
-
-Configura las variables de conexión usando `.env.example` como referencia. Spring Boot lee las variables del entorno del proceso; el archivo `.env.example` no se carga automáticamente. En PowerShell, por ejemplo:
+Requiere Docker Desktop con Docker Compose. Desde `prueba-fullstack`:
 
 ```powershell
-$env:DB_URL = "jdbc:postgresql://localhost:5432/tickets"
-$env:DB_USERNAME = "postgres"
-$env:DB_PASSWORD = "tu-clave"
+Copy-Item .env.example .env
+docker compose up --build -d
 ```
 
-Hibernate actualiza el esquema existente con `JPA_DDL_AUTO=update`. Para producción se recomienda gestionar los cambios de esquema con migraciones versionadas y cambiar esta opción a `validate`.
+Este repositorio contiene solo el backend: Compose levanta PostgreSQL 16 y Spring Boot. El frontend React se mantiene por separado en `front-fullstack`. PostgreSQL conserva los datos en el volumen `postgres_data`; el backend espera a que la base esté saludable. El esquema de tablas se crea/actualiza con Hibernate (`JPA_DDL_AUTO=update`).
+
+- API REST: `http://localhost:8080/api/tickets`
+- PostgreSQL desde el host: `localhost:5432` (base `tickets`)
+- Frontend de desarrollo (si tienes `front-fullstack`): `http://localhost:5173`
+
+Edita `.env` para personalizar `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `DB_PORT`, `SERVER_PORT` y `FRONTEND_ORIGIN` antes de iniciar los contenedores. `.env` es local y está excluido de Git. Cambiar las credenciales después de crear el volumen no modifica las credenciales que PostgreSQL ya guardó; para una base nueva puede borrarse el volumen con `docker compose down -v` (esto elimina todos sus datos).
+
+Comandos útiles:
+
+```powershell
+docker compose ps
+docker compose logs -f postgres backend
+docker compose down
+```
+
+Para parar los servicios y preservar los datos utiliza `docker compose down`, sin `-v`. Usa credenciales fuertes y `JPA_DDL_AUTO=validate` junto con migraciones versionadas fuera del entorno local.
+
+## Ejecutar sin Docker
+
+Se requiere Java 17 o superior, PostgreSQL 14 o superior y Node.js 20.19+ con npm. Crea una base llamada `tickets`, configura `DB_URL`, `DB_USERNAME` y `DB_PASSWORD` en el entorno, y luego ejecuta:
 
 ## Ejecutar backend
 
@@ -34,13 +41,13 @@ Desde la carpeta `prueba-fullstack`:
 .\mvnw.cmd spring-boot:run
 ```
 
-El servicio queda disponible en `http://localhost:8080`. Si el frontend se sirve desde otro origen, configura `FRONTEND_ORIGIN`. Ejecuta las pruebas y el build con:
+El servicio queda disponible en `http://localhost:8080`. Si el frontend se sirve desde otro origen, configura `FRONTEND_ORIGIN`. Ejecuta las pruebas con:
 
 ```powershell
 .\mvnw.cmd test
 ```
 
-## Ejecutar frontend
+Para ejecutar el frontend de desarrollo sin Docker:
 
 Desde la carpeta separada `front-fullstack` (consulta su `.env.example` y copia ese archivo como `.env.local` si necesitas cambiar la URL de la API):
 
@@ -49,7 +56,7 @@ npm install
 npm run dev
 ```
 
-Vite publica la aplicación en `http://localhost:5173`. Si el backend está en otra dirección, configura `VITE_API_URL` en `front-fullstack/.env.local` (por ejemplo, `VITE_API_URL=http://localhost:8080/api`). La API permite CORS para ese origen; ajusta `frontend.origin` si utilizas otro.
+Vite publica la aplicación en `http://localhost:5173`. Si el backend está en otra dirección, configura `VITE_API_URL` en `front-fullstack/.env.local` (por ejemplo, `VITE_API_URL=http://localhost:8080/api`). La API permite CORS para ese origen; ajusta `FRONTEND_ORIGIN` si utilizas otro.
 
 ## API
 
@@ -73,7 +80,29 @@ Las notificaciones están deshabilitadas de forma predeterminada. Para activarla
 
 ## Arquitectura Hexagonal
 
-El dominio (`domain`) contiene entidades y reglas de negocio independientes de Spring y la base de datos. Los casos de uso (`application`) dependen de puertos; los adaptadores de entrada exponen REST, y los adaptadores de salida implementan la persistencia PostgreSQL y la notificación Hablame. Esta inversión de dependencias permite probar las reglas sin infraestructura y reemplazar proveedores sin modificar el dominio.
+El backend Java utiliza el paquete raíz `com.tuempresa.soporte` y agrupa la funcionalidad de solicitudes de soporte por capa:
+
+```text
+com/tuempresa/soporte/
+├── domain/
+│   ├── model/          # Solicitud, HistorialCambios, Categoria, Prioridad, Estado
+│   ├── exception/      # Excepciones del dominio
+│   └── port/
+│       ├── in/         # Interfaces de casos de uso y sus comandos
+│       └── out/        # Contratos de persistencia y SMS
+├── application/
+│   └── service/        # Orquestación de casos de uso; solo importa dominio/puertos
+└── infrastructure/
+    ├── adapter/
+    │   ├── in/web/     # Controlador REST, DTOs y mapper HTTP
+    │   └── out/
+    │       ├── persistence/ # SolicitudJpaEntity, repositorios Spring Data y mapper
+    │       └── messaging/   # Adaptador Hablame
+    ├── config/         # Beans y CORS
+    └── exception/      # Manejo HTTP global de errores
+```
+
+`Solicitud` y `HistorialCambios` son clases Java puras. `SolicitudJpaEntity` y `HistorialCambiosJpaEntity`, ubicadas en `infrastructure.adapter.out.persistence`, son los modelos JPA y no se exponen como dominio. `domain` no depende de Spring/JPA; los servicios dependen de interfaces de `domain.port`, y la infraestructura implementa y conecta esos puertos mediante la configuración de Spring. Esta inversión permite probar las reglas sin infraestructura y reemplazar proveedores sin modificar el dominio.
 
 ## Ramas
 
